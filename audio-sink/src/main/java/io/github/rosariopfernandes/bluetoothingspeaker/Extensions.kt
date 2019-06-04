@@ -1,4 +1,4 @@
-package io.github.rosariopfernandes.btspeaksthings
+package io.github.rosariopfernandes.bluetoothingspeaker
 
 import android.bluetooth.BluetoothAdapter
 import android.bluetooth.BluetoothDevice
