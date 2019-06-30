@@ -122,7 +122,7 @@ class A2dpSinkActivity : Activity() {
 
         btnPair = findViewById(R.id.btnPair)
         btnDisconnect = findViewById(R.id.btnDisconnect)
-
+      
         tvInformation = findViewById(R.id.tvInformation)
 
         val manager = getSystemService(Context.AUDIO_SERVICE) as AudioManager
@@ -252,6 +252,7 @@ class A2dpSinkActivity : Activity() {
         super.onActivityResult(requestCode, resultCode, data)
         if (requestCode == REQUEST_CODE_ENABLE_DISCOVERABLE) {
             display("Enable discoverable returned with result $resultCode")
+            Log.d(TAG, "Enable discoverable returned with result $resultCode")
 
             // ResultCode, as described in BluetoothAdapter.ACTION_REQUEST_DISCOVERABLE, is either
             // RESULT_CANCELED or the number of milliseconds that the device will stay in
@@ -325,7 +326,6 @@ class A2dpSinkActivity : Activity() {
         tvInformation.text = text
         Log.d(TAG, text)
     }
-
     companion object {
         private const val TAG = "A2dpSinkActivity"
 

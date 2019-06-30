@@ -34,6 +34,7 @@ output.
 ## License
 
 Copyright 2017 The Android Open Source Project, Inc.
+Copyright 2019 Rosário Pereira Fernandes
 
 Copyright 2019 Rosário Pereira Fernandes
 
