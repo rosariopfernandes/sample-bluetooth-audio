@@ -32,8 +32,12 @@ import android.widget.Button
 import android.widget.TextView
 import com.example.androidthings.bluetooth.audio.R
 import com.google.android.things.bluetooth.BluetoothProfileManager
-import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.database.DataSnapshot
+import com.google.firebase.database.DatabaseError
+import com.google.firebase.database.FirebaseDatabase
+import com.google.firebase.database.ValueEventListener
 import io.github.rosariopfernandes.bluetoothingspeaker.remotecontrol.Device
+import io.github.rosariopfernandes.bluetoothingspeaker.remotecontrol.DeviceSettings
 import java.util.Objects
 import java.util.Locale
 
@@ -132,10 +136,12 @@ class A2dpSinkActivity : Activity() {
         tvInformation = findViewById(R.id.tvInformation)
         slider = findViewById(R.id.sbVolume)
 
-        // Firestore
-        val firestore = FirebaseFirestore.getInstance()
+        // Realtime Database
+        FirebaseDatabase.getInstance().setPersistenceEnabled(true)
+        val db = FirebaseDatabase.getInstance()
         val deviceId = Settings.Secure.getString(contentResolver, Settings.Secure.ANDROID_ID)
-        val deviceRef = firestore.collection("devices").document(deviceId)
+        val deviceRef = db.getReference("devices").child(deviceId)
+        deviceRef.keepSynced(true)
 
         // Volume Control
         slider.setOnSeekArcChangeListener(object : SeekArc.OnSeekArcChangeListener {
@@ -143,7 +149,8 @@ class A2dpSinkActivity : Activity() {
                 if (fromUser) {
                     // TODO: Consider using the Realtime Database instead
                     // Because of the number of update operations performed here
-                    deviceRef.update("settings.current_volume", volume)
+                    deviceRef.child("settings")
+                            .updateChildren(mapOf("current_volume" to volume))
                 }
                 setVolume(volume)
             }
@@ -171,42 +178,36 @@ class A2dpSinkActivity : Activity() {
             return
         }
 
-        deviceRef.get().addOnCompleteListener { task ->
-            deviceName = if (task.isSuccessful) {
-                val device = task.result.toDevice()
-                slider.progress = device.settings.current_volume
-                device.friendly_name
-            } else {
-                Device().friendly_name
-            }
-            registerReceiver(adapterStateChangeReceiver, IntentFilter(
-                    BluetoothAdapter.ACTION_STATE_CHANGED))
-            registerReceiver(sinkProfileStateChangeReceiver, IntentFilter(
-                    ACTION_CONNECTION_STATE_CHANGED))
-            registerReceiver(sinkProfilePlaybackChangeReceiver, IntentFilter(
-                    ACTION_PLAYING_STATE_CHANGED))
-
-            bluetoothAdapter?.let {
-                if (it.isEnabled) {
-                    display("Bluetooth Adapter is already enabled.")
-                    initA2DPSink()
+        // Initialize Device with name from the Database
+        deviceRef.addListenerForSingleValueEvent(object : ValueEventListener {
+            override fun onDataChange(snapshot: DataSnapshot) {
+                if (snapshot.exists()) {
+                    val device = snapshot.toDevice()
+                    deviceName = device.friendly_name
+                    slider.progress = device.settings.current_volume
                 } else {
-                    display("Bluetooth adapter not enabled. Enabling.")
-                    it.enable()
+                    deviceRef.setValue(Device())
                 }
-            }
-        }
-
-        deviceRef.addSnapshotListener { snapshot, e ->
-            if (e != null) {
-                display("Failed to fetch data from the Cloud.")
-                return@addSnapshotListener
+                registerBrodcastReceivers()
             }
 
-            val device = snapshot.toDevice()
-            val settings = device.settings
-            slider.progress = settings.current_volume
-        }
+            override fun onCancelled(e: DatabaseError) {
+                deviceName = Device().friendly_name
+                registerBrodcastReceivers()
+            }
+        })
+
+        // Control Volume
+        deviceRef.child("settings").addValueEventListener(object : ValueEventListener {
+            override fun onDataChange(snapshot: DataSnapshot) {
+                val settings = snapshot.getValue(DeviceSettings::class.java)!!
+                slider.progress = settings.current_volume
+            }
+
+            override fun onCancelled(e: DatabaseError) {
+                display("Failed to fetch data from the Cloud: ${e.message}")
+            }
+        })
 
     }
 
@@ -267,6 +268,25 @@ class A2dpSinkActivity : Activity() {
         }, A2DP_SINK_PROFILE)
 
         configureButton()
+    }
+
+    private fun registerBrodcastReceivers() {
+        registerReceiver(adapterStateChangeReceiver, IntentFilter(
+                BluetoothAdapter.ACTION_STATE_CHANGED))
+        registerReceiver(sinkProfileStateChangeReceiver, IntentFilter(
+                ACTION_CONNECTION_STATE_CHANGED))
+        registerReceiver(sinkProfilePlaybackChangeReceiver, IntentFilter(
+                ACTION_PLAYING_STATE_CHANGED))
+
+        bluetoothAdapter?.let {
+            if (it.isEnabled) {
+                display("Bluetooth Adapter is already enabled.")
+                initA2DPSink()
+            } else {
+                display("Bluetooth adapter not enabled. Enabling.")
+                it.enable()
+            }
+        }
     }
 
     /**
