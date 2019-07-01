@@ -20,6 +20,8 @@ import android.bluetooth.BluetoothDevice
 import android.bluetooth.BluetoothProfile
 import android.content.Intent
 import android.util.Log
+import com.google.firebase.database.DataSnapshot
+import io.github.rosariopfernandes.bluetoothingspeaker.remotecontrol.Device
 import java.lang.reflect.InvocationTargetException
 
 fun Intent.getPreviousAdapterState(): Int {
@@ -61,5 +63,12 @@ fun BluetoothDevice.disconnect(profile: BluetoothProfile): Boolean {
                 "${profile.javaClass.name}, ignoring request.", e)
         false
     }
+}
 
+fun DataSnapshot?.toDevice(): Device {
+    return if (this != null && exists()) {
+        getValue(Device::class.java)!!
+    } else {
+        Device()
+    }
 }
