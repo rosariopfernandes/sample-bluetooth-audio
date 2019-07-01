@@ -20,4 +20,8 @@
     <string name="action_pair">Pair</string>
     <string name="action_disconnect">Disconnect</string>
     <string name="current_volume">Volume: %d/%d</string>
+    <string name="title_activity_login">Sign in</string>
+    <string name="prompt_email">Email</string>
+    <string name="prompt_password">Password</string>
+    <string name="action_sign_in_short">Sign in</string>
 </resources>
