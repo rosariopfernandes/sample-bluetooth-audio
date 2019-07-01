@@ -16,7 +16,7 @@
   limitations under the License.
   -->
 <resources>
-    <string name="app_name">Android Things Bluetooth Audio app</string>
+    <string name="app_name">bluetoothingspeaker</string>
     <string name="action_pair">Pair</string>
     <string name="action_disconnect">Disconnect</string>
     <string name="current_volume">Volume: %d/%d</string>
