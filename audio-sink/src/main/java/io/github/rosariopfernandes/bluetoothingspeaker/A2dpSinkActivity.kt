@@ -33,9 +33,13 @@ import android.widget.TextView
 import com.example.androidthings.bluetooth.audio.R
 import com.google.android.things.bluetooth.BluetoothProfileManager
 import com.google.firebase.database.DataSnapshot
-import com.google.firebase.database.DatabaseError
-import com.google.firebase.database.FirebaseDatabase
 import com.google.firebase.database.ValueEventListener
+import com.google.firebase.database.DatabaseError
+import com.google.firebase.database.DatabaseReference
+import com.google.firebase.database.ChildEventListener
+import com.google.firebase.database.FirebaseDatabase
+import io.github.rosariopfernandes.bluetoothingspeaker.remotecontrol.Action
+import io.github.rosariopfernandes.bluetoothingspeaker.remotecontrol.ActionType
 import io.github.rosariopfernandes.bluetoothingspeaker.remotecontrol.Device
 import io.github.rosariopfernandes.bluetoothingspeaker.remotecontrol.DeviceSettings
 import java.util.Objects
@@ -50,6 +54,7 @@ class A2dpSinkActivity : Activity() {
     private lateinit var btnDisconnect: Button
     private lateinit var tvInformation: TextView
     private lateinit var slider: SeekArc
+    private lateinit var deviceRef: DatabaseReference
 
     private var textToSpeech: TextToSpeech? = null
     private var manager: AudioManager? = null
@@ -140,15 +145,13 @@ class A2dpSinkActivity : Activity() {
         FirebaseDatabase.getInstance().setPersistenceEnabled(true)
         val db = FirebaseDatabase.getInstance()
         val deviceId = Settings.Secure.getString(contentResolver, Settings.Secure.ANDROID_ID)
-        val deviceRef = db.getReference("devices").child(deviceId)
+        deviceRef = db.getReference("devices").child(deviceId)
         deviceRef.keepSynced(true)
 
         // Volume Control
         slider.setOnSeekArcChangeListener(object : SeekArc.OnSeekArcChangeListener {
             override fun onProgressChanged(seekArc: SeekArc?, volume: Int, fromUser: Boolean) {
                 if (fromUser) {
-                    // TODO: Consider using the Realtime Database instead
-                    // Because of the number of update operations performed here
                     deviceRef.child("settings")
                             .updateChildren(mapOf("current_volume" to volume))
                 }
@@ -189,6 +192,8 @@ class A2dpSinkActivity : Activity() {
                     deviceRef.setValue(Device())
                 }
                 registerBrodcastReceivers()
+                addVolumeListener(deviceRef)
+                addActionListener(deviceRef)
             }
 
             override fun onCancelled(e: DatabaseError) {
@@ -197,7 +202,9 @@ class A2dpSinkActivity : Activity() {
             }
         })
 
-        // Control Volume
+    }
+
+    private fun addVolumeListener(deviceRef: DatabaseReference) {
         deviceRef.child("settings").addValueEventListener(object : ValueEventListener {
             override fun onDataChange(snapshot: DataSnapshot) {
                 val settings = snapshot.getValue(DeviceSettings::class.java)!!
@@ -208,7 +215,35 @@ class A2dpSinkActivity : Activity() {
                 display("Failed to fetch data from the Cloud: ${e.message}")
             }
         })
+    }
 
+    private fun addActionListener(deviceRef: DatabaseReference) {
+        deviceRef.child("actions").addChildEventListener(object: ChildEventListener {
+            override fun onChildAdded(snapshot: DataSnapshot, p1: String?) {
+                val actionKey = snapshot.key!!
+                val action = snapshot.getValue(Action::class.java)
+                if (action != null) {
+                    handleAction(action)
+                }
+                deviceRef.child("actions").child(actionKey).removeValue()
+            }
+
+            override fun onChildMoved(p0: DataSnapshot, p1: String?) {
+
+            }
+
+            override fun onChildChanged(snapshot: DataSnapshot, p1: String?) {
+
+            }
+
+            override fun onChildRemoved(p0: DataSnapshot) {
+
+            }
+
+            override fun onCancelled(p0: DatabaseError) {
+
+            }
+        })
     }
 
     override fun onDestroy() {
@@ -376,12 +411,24 @@ class A2dpSinkActivity : Activity() {
     private fun display(text: String) {
         tvInformation.text = text
         Log.d(TAG, text)
+        deviceRef.child("status").setValue(text)
     }
 
     private fun setVolume(volume: Int) {
         manager?.setStreamVolume(AudioManager.STREAM_MUSIC, volume, 0)
         val maxVolume = manager?.getStreamMaxVolume(AudioManager.STREAM_MUSIC)
         display(getString(R.string.current_volume, volume, maxVolume))
+    }
+
+    private fun handleAction(action: Action) {
+        when (action.type) {
+            ActionType.PAIR -> {
+                enableDiscoverable()
+            }
+            ActionType.DISCONNECT -> {
+                disconnectConnectedDevices()
+            }
+        }
     }
 
     companion object {
